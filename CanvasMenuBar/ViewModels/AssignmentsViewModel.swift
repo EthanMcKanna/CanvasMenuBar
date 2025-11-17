@@ -38,6 +38,14 @@ final class AssignmentsViewModel: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private var allAssignments: [Assignment] = []
     private var todayAssignments: [Assignment] = []
+    private var assignmentCache: [String: [Assignment]] = [:]
+    private let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+        return formatter
+    }()
+    private var fetchGeneration = 0
     private let defaults: UserDefaults
     private let filterDefaultsKey = "AssignmentsFilter"
 
@@ -66,7 +74,6 @@ final class AssignmentsViewModel: ObservableObject {
     }
 
     func refresh(reason: RefreshReason = .manual) async {
-        guard !isLoading else { return }
         guard let configuration = settings.sourceConfiguration() else {
             assignments = []
             allAssignments = []
@@ -75,34 +82,28 @@ final class AssignmentsViewModel: ObservableObject {
             return
         }
 
+        fetchGeneration += 1
+        let generation = fetchGeneration
+        let targetDate = selectedDate
         isLoading = true
         errorMessage = nil
 
-        let bounds = Calendar.current.dayBounds(for: selectedDate)
         do {
-            let fetched: [Assignment]
-            switch configuration {
-            case .canvasAPI(let credentials):
-                fetched = try await api.fetchAssignments(credentials: credentials, bounds: bounds)
-            case .calendarFeed(let url):
-                fetched = try await ICSAssignmentsService().fetchAssignments(feedURL: url, bounds: bounds)
+            let fetched = try await fetchAssignments(for: targetDate, configuration: configuration)
+            processFetched(fetched, for: targetDate)
+            if Calendar.current.isDate(targetDate, inSameDayAs: selectedDate) {
+                lastUpdatedAt = Date()
             }
-            allAssignments = fetched.sorted { lhs, rhs in
-                let leftDate = lhs.normalizedDueDate ?? .distantFuture
-                let rightDate = rhs.normalizedDueDate ?? .distantFuture
-                return leftDate < rightDate
-            }
-            if Calendar.current.isDate(selectedDate, inSameDayAs: Date()) {
-                todayAssignments = allAssignments
-            }
-            applyFilter()
-            lastUpdatedAt = Date()
-            loadCompletions()
+            prefetchAdjacentDays(from: targetDate, configuration: configuration)
         } catch {
-            errorMessage = error.localizedDescription
+            if Calendar.current.isDate(targetDate, inSameDayAs: selectedDate) {
+                errorMessage = error.localizedDescription
+            }
         }
 
-        isLoading = false
+        if generation == fetchGeneration {
+            isLoading = false
+        }
     }
 
     func manualRefresh() {
@@ -193,6 +194,7 @@ private extension AssignmentsViewModel {
     func observeSettings() {
         settings.$configurationVersion
             .sink { [weak self] _ in
+                self?.invalidateCache()
                 Task { await self?.refresh(reason: .configuration) }
             }
             .store(in: &cancellables)
@@ -233,15 +235,84 @@ private extension AssignmentsViewModel {
     func prepareForNewDate(_ date: Date) {
         selectedDate = date
         loadCompletions()
-        allAssignments = []
-        assignments = []
         errorMessage = nil
+        if let cached = cachedAssignments(for: date) {
+            allAssignments = cached
+            applyFilter()
+        } else {
+            allAssignments = []
+            assignments = []
+        }
     }
 
-    private func badgeAssignments() -> [Assignment] {
+    func processFetched(_ fetched: [Assignment], for date: Date) {
+        allAssignments = fetched.sorted { lhs, rhs in
+            let leftDate = lhs.normalizedDueDate ?? .distantFuture
+            let rightDate = rhs.normalizedDueDate ?? .distantFuture
+            return leftDate < rightDate
+        }
+        cache(assignments: allAssignments, for: date)
+        if Calendar.current.isDateInToday(date) {
+            todayAssignments = allAssignments
+        }
+        if Calendar.current.isDate(date, inSameDayAs: selectedDate) {
+            applyFilter()
+            loadCompletions()
+        }
+    }
+
+    func badgeAssignments() -> [Assignment] {
         if Calendar.current.isDate(selectedDate, inSameDayAs: Date()) {
             return allAssignments
         }
         return todayAssignments
+    }
+
+    func fetchAssignments(for date: Date, configuration: AssignmentsSourceConfiguration) async throws -> [Assignment] {
+        let bounds = Calendar.current.dayBounds(for: date)
+        switch configuration {
+        case .canvasAPI(let credentials):
+            return try await api.fetchAssignments(credentials: credentials, bounds: bounds)
+        case .calendarFeed(let url):
+            return try await ICSAssignmentsService().fetchAssignments(feedURL: url, bounds: bounds)
+        }
+    }
+
+    func dayKey(for date: Date) -> String {
+        dayFormatter.string(from: Calendar.current.startOfDay(for: date))
+    }
+
+    func cache(assignments: [Assignment], for date: Date) {
+        assignmentCache[dayKey(for: date)] = assignments
+    }
+
+    func cachedAssignments(for date: Date) -> [Assignment]? {
+        assignmentCache[dayKey(for: date)]
+    }
+
+    func prefetchAdjacentDays(from date: Date, configuration: AssignmentsSourceConfiguration) {
+        for offset in [-2, -1, 1, 2] {
+            guard let target = Calendar.current.date(byAdding: .day, value: offset, to: date) else { continue }
+            if cachedAssignments(for: target) != nil { continue }
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let result = try await fetchAssignments(for: target, configuration: configuration)
+                    await MainActor.run {
+                        self.cache(assignments: result, for: target)
+                        if Calendar.current.isDateInToday(target) {
+                            self.todayAssignments = result
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+        }
+    }
+
+    func invalidateCache() {
+        assignmentCache.removeAll()
+        todayAssignments = []
     }
 }
