@@ -69,16 +69,24 @@ struct SettingsView: View {
                 SectionCard(title: "Auto Refresh",
                             systemImage: "arrow.clockwise",
                             description: "Canvas assignments reload automatically while the app is running.") {
-                    Picker("Frequency", selection: $settings.refreshMinutes) {
-                        Text("Every 5 min").tag(5)
-                        Text("Every 15 min").tag(15)
-                        Text("Every 30 min").tag(30)
-                        Text("Every hour").tag(60)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Frequency")
+                            .font(.subheadline.weight(.semibold))
+                        Picker("Frequency", selection: $settings.refreshMinutes) {
+                            Text("Every 5 min").tag(5)
+                            Text("Every 15 min").tag(15)
+                            Text("Every 30 min").tag(30)
+                            Text("Every hour").tag(60)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .controlSize(.small)
+                        .accessibilityLabel("Auto refresh frequency")
+
+                        Text("You can still refresh manually from the menu bar.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.segmented)
-                    Text("You can still refresh manually from the menu bar.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
                 SectionCard(title: "Menu Bar",
@@ -127,7 +135,6 @@ struct SettingsView: View {
             .padding(24)
         }
         .frame(minWidth: 420, idealWidth: 480, minHeight: 460)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var header: some View {

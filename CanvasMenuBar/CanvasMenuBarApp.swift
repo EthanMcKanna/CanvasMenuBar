@@ -23,10 +23,6 @@ struct CanvasMenuBarApp: App {
             }
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView(settings: settingsStore)
-        }
     }
 }
 

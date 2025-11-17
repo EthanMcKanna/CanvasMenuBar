@@ -6,8 +6,24 @@ struct AssignmentsMenuView: View {
     @ObservedObject var settings: SettingsStore
     @Environment(\.openURL) private var openURL
     @State private var detailAssignment: Assignment?
+    @State private var showingSettings = false
 
     var body: some View {
+        Group {
+            if showingSettings {
+                settingsContent
+            } else {
+                assignmentsContent
+            }
+        }
+        .frame(width: 430, height: 620)
+        .animation(.spring(response: 0.3, dampingFraction: 0.9), value: showingSettings)
+        .sheet(item: $detailAssignment) { assignment in
+            AssignmentDetailView(assignment: assignment)
+        }
+    }
+
+    private var assignmentsContent: some View {
         GeometryReader { proxy in
             VStack(alignment: .leading, spacing: 10) {
                 header
@@ -44,10 +60,43 @@ struct AssignmentsMenuView: View {
                 }
             }
         }
-        .frame(width: 430, height: 620)
-        .sheet(item: $detailAssignment) { assignment in
-            AssignmentDetailView(assignment: assignment)
+        .transition(.move(edge: .leading).combined(with: .opacity))
+    }
+
+    private var settingsContent: some View {
+        VStack(spacing: 0) {
+            settingsToolbar
+            Divider()
+            SettingsView(settings: settings)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .transition(.move(edge: .trailing).combined(with: .opacity))
+    }
+
+    private var settingsToolbar: some View {
+        ZStack {
+            HStack {
+                Button {
+                    closeSettings()
+                } label: {
+                    Label("Assignments", systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button("Done") {
+                    closeSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            Text("Settings")
+                .font(.headline)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var header: some View {
@@ -288,7 +337,15 @@ struct AssignmentsMenuView: View {
     }
 
     private func openSettings() {
-        SettingsWindowPresenter.shared.present(settings: settings)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            showingSettings = true
+        }
+    }
+
+    private func closeSettings() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            showingSettings = false
+        }
     }
 }
 
