@@ -32,6 +32,7 @@ struct Assignment: Identifiable, Equatable {
     let htmlURL: URL?
     let pointsPossible: Double?
     let description: String?
+    let richDescription: AttributedString?
     let location: String?
     let kind: Kind
     let tags: [String]
@@ -100,14 +101,16 @@ struct Assignment: Identifiable, Equatable {
     }
 
     var detailSnippet: String? {
-        guard let description else { return nil }
+        guard let description else {
+            if let richDescription, !richDescription.characters.isEmpty {
+                let plain = String(richDescription.characters)
+                return Assignment.makeSnippet(from: plain)
+            }
+            return nil
+        }
         let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let lines = trimmed.components(separatedBy: CharacterSet.newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        guard !lines.isEmpty else { return nil }
-        return lines.prefix(3).joined(separator: " \u{2022} ")
+        return Assignment.makeSnippet(from: trimmed)
     }
 
     var metadataBadges: [String] {
@@ -118,9 +121,35 @@ struct Assignment: Identifiable, Equatable {
         badges.append(contentsOf: tags)
         return badges.uniquePreservingOrder()
     }
+
+    var hasDetails: Bool {
+        if let description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        if let richDescription, !richDescription.characters.isEmpty {
+            return true
+        }
+        return false
+    }
+
+    var mapsURL: URL? {
+        guard let locationLine,
+              let encoded = locationLine.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return nil
+        }
+        return URL(string: "http://maps.apple.com/?q=\(encoded)")
+    }
+
+    static func makeSnippet(from text: String) -> String? {
+        let lines = text.components(separatedBy: CharacterSet.newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return nil }
+        return lines.prefix(3).joined(separator: " \u{2022} ")
+    }
 }
 
-private extension Array where Element: Hashable {
+extension Array where Element: Hashable {
     func uniquePreservingOrder() -> [Element] {
         var seen = Set<Element>()
         return self.filter { element in

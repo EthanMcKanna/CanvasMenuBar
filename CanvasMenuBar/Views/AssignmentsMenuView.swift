@@ -5,6 +5,7 @@ struct AssignmentsMenuView: View {
     @ObservedObject var viewModel: AssignmentsViewModel
     @ObservedObject var settings: SettingsStore
     @Environment(\.openURL) private var openURL
+    @State private var detailAssignment: Assignment?
 
     var body: some View {
         GeometryReader { proxy in
@@ -12,6 +13,9 @@ struct AssignmentsMenuView: View {
                 header
                 dateNavigator
                 filterPicker
+                if !viewModel.courseFilters.isEmpty {
+                    courseFiltersView
+                }
                 if settings.showAssignmentTracker && viewModel.hasTrackableAssignments {
                     progressSummary
                 }
@@ -41,6 +45,9 @@ struct AssignmentsMenuView: View {
             }
         }
         .frame(width: 430, height: 620)
+        .sheet(item: $detailAssignment) { assignment in
+            AssignmentDetailView(assignment: assignment)
+        }
     }
 
     private var header: some View {
@@ -103,6 +110,49 @@ struct AssignmentsMenuView: View {
         .pickerStyle(.segmented)
     }
 
+    private var courseFiltersView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Courses", systemImage: "line.3.horizontal.decrease.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if viewModel.isFilteringCourses {
+                    Button("Clear") {
+                        viewModel.clearCourseFilters()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(viewModel.courseFilters) { filter in
+                        Button {
+                            viewModel.toggleCourseFilter(filter.name)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(filter.name)
+                                    .lineLimit(1)
+                                Text("\(filter.count)")
+                                    .font(.caption2)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.primary.opacity(0.08))
+                                    )
+                            }
+                        }
+                        .buttonStyle(FilterChipStyle(isActive: viewModel.selectedCourses.contains(filter.name)))
+                        .help("Show only \(filter.name)")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
     private var progressSummary: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -160,11 +210,36 @@ struct AssignmentsMenuView: View {
                             showsTracker: settings.showAssignmentTracker,
                             toggleCompletion: (settings.showAssignmentTracker && assignment.kind == .assignment) ? {
                                 viewModel.toggleCompletion(for: assignment)
+                            } : nil,
+                            showDetails: assignment.hasDetails ? {
+                                presentDetails(for: assignment)
                             } : nil
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
                             openAssignment(assignment)
+                        }
+                        .contextMenu {
+                            if assignment.htmlURL != nil {
+                                Button("Open in Canvas", systemImage: "safari") {
+                                    openAssignment(assignment)
+                                }
+                            }
+                            if assignment.hasDetails {
+                                Button("View Details", systemImage: "text.justify.left") {
+                                    presentDetails(for: assignment)
+                                }
+                            }
+                            if let location = assignment.locationLine {
+                                Button("Copy Location", systemImage: "doc.on.doc") {
+                                    copyLocation(location)
+                                }
+                                if let mapsURL = assignment.mapsURL {
+                                    Button("Open in Maps", systemImage: "map") {
+                                        openURL(mapsURL)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -202,7 +277,38 @@ struct AssignmentsMenuView: View {
         openURL(url)
     }
 
+    private func presentDetails(for assignment: Assignment) {
+        detailAssignment = assignment
+    }
+
+    private func copyLocation(_ location: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(location, forType: .string)
+    }
+
     private func openSettings() {
         SettingsWindowPresenter.shared.present(settings: settings)
+    }
+}
+
+private struct FilterChipStyle: ButtonStyle {
+    let isActive: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .foregroundColor(isActive ? Color.accentColor : Color.primary)
+            .background(
+                Capsule()
+                    .fill(isActive ? Color.accentColor.opacity(0.2) : Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isActive ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
     }
 }

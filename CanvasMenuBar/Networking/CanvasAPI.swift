@@ -267,6 +267,7 @@ private struct CanvasCalendarEvent: Decodable {
             htmlURL: assignment?.htmlURL ?? htmlURL,
             pointsPossible: assignment?.pointsPossible,
             description: nil,
+            richDescription: nil,
             location: nil,
             kind: .assignment,
             tags: [],

@@ -1,6 +1,7 @@
 import Foundation
+import AppKit
 
-struct ICSAssignmentsService {
+actor ICSAssignmentsService {
     enum Error: LocalizedError {
         case invalidResponse
         case statusCode(Int)
@@ -18,21 +19,70 @@ struct ICSAssignmentsService {
         }
     }
 
+    static let shared = ICSAssignmentsService()
+
+    private struct FeedCache {
+        var etag: String?
+        var assignments: [Assignment]
+        var assignmentsByDay: [String: [Assignment]]
+        var lastValidated: Date
+    }
+
     private let session: URLSession
+    private var cache: [URL: FeedCache] = [:]
+    private let dayFormatter: DateFormatter
 
     init(session: URLSession = .shared) {
         self.session = session
+        self.dayFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = .current
+            return formatter
+        }()
     }
 
-    func fetchAssignments(feedURL: URL, bounds: DayBounds) async throws -> [Assignment] {
-        var request = URLRequest(url: feedURL)
+    func fetchAssignments(feedURL: URL, bounds: DayBounds, forceReload: Bool) async throws -> [Assignment] {
+        var state = cache[feedURL]
+        if forceReload || state == nil {
+            let updated = try await downloadFeed(from: feedURL, existing: state)
+            state = updated
+            cache[feedURL] = updated
+        }
+        guard let finalState = state else {
+            throw Error.decodingFailed
+        }
+        return assignments(in: finalState, bounds: bounds)
+    }
+
+    func invalidateCache(for url: URL? = nil) {
+        if let url {
+            cache[url] = nil
+        } else {
+            cache.removeAll()
+        }
+    }
+
+    private func downloadFeed(from url: URL, existing: FeedCache?) async throws -> FeedCache {
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("text/calendar", forHTTPHeaderField: "Accept")
+        if let etag = existing?.etag {
+            request.addValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw Error.invalidResponse
         }
+
+        if httpResponse.statusCode == 304, let existing {
+            var refreshed = existing
+            refreshed.lastValidated = Date()
+            refreshed.etag = httpResponse.value(forHTTPHeaderField: "Etag") ?? httpResponse.value(forHTTPHeaderField: "ETag") ?? existing.etag
+            return refreshed
+        }
+
         guard (200..<300).contains(httpResponse.statusCode) else {
             throw Error.statusCode(httpResponse.statusCode)
         }
@@ -42,12 +92,34 @@ struct ICSAssignmentsService {
         }
 
         let events = ICSParser().parseEvents(from: fileContents)
-        let assignments = events.compactMap { event -> Assignment? in
-            guard let dueDate = event.dueDate else { return nil }
-            guard dueDate.isWithin(bounds) else { return nil }
-            return event.asAssignment()
+        let assignments = events.compactMap { $0.asAssignment() }
+        let grouped = buildDayIndex(for: assignments)
+        let etag = httpResponse.value(forHTTPHeaderField: "Etag") ?? httpResponse.value(forHTTPHeaderField: "ETag")
+        return FeedCache(etag: etag, assignments: assignments, assignmentsByDay: grouped, lastValidated: Date())
+    }
+
+    private func assignments(in cache: FeedCache, bounds: DayBounds) -> [Assignment] {
+        let key = dayFormatter.string(from: Calendar.current.startOfDay(for: bounds.start))
+        if let cached = cache.assignmentsByDay[key] {
+            return cached.filter { assignment in
+                guard let date = assignment.normalizedDueDate else { return false }
+                return date.isWithin(bounds)
+            }
         }
-        return assignments
+        return cache.assignments.filter { assignment in
+            guard let date = assignment.normalizedDueDate else { return false }
+            return date.isWithin(bounds)
+        }
+    }
+
+    private func buildDayIndex(for assignments: [Assignment]) -> [String: [Assignment]] {
+        var map: [String: [Assignment]] = [:]
+        for assignment in assignments {
+            guard let date = assignment.normalizedDueDate else { continue }
+            let key = dayFormatter.string(from: Calendar.current.startOfDay(for: date))
+            map[key, default: []].append(assignment)
+        }
+        return map
     }
 }
 
@@ -135,15 +207,16 @@ private struct ICSParser {
     }
 
     private func unfoldLines(_ contents: String) -> [String] {
-        let rawLines = contents.components(separatedBy: CharacterSet.newlines)
+        let normalized = contents
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let rawLines = normalized.components(separatedBy: "\n")
         var unfolded: [String] = []
         for line in rawLines {
             if line.hasPrefix(" ") || line.hasPrefix("\t") {
+                guard !unfolded.isEmpty else { continue }
                 let trimmed = line.dropFirst()
-                if var last = unfolded.popLast() {
-                    last.append(String(trimmed))
-                    unfolded.append(last)
-                }
+                unfolded[unfolded.count - 1].append(String(trimmed))
             } else {
                 unfolded.append(line)
             }
@@ -171,27 +244,34 @@ private struct ICSParser {
 }
 
 private extension ICSParser.Event {
+    struct DescriptionContent {
+        let plain: String?
+        let rich: AttributedString?
+    }
+
     var dueDate: Date? { startDate ?? endDate }
 
-    func asAssignment() -> Assignment {
+    func asAssignment() -> Assignment? {
+        guard dueDate != nil else { return nil }
         let normalizedSummary = (summary ?? "Canvas Event").trimmingCharacters(in: .whitespacesAndNewlines)
-        let extracted = SummarySplitter.split(normalizedSummary)
-        let detailText = sanitizedDescription()
+        let parts = SummarySplitter.split(normalizedSummary)
+        let description = descriptionContent()
 
         return Assignment(
             id: uid ?? UUID().uuidString,
-            title: extracted.title,
-            courseName: extracted.course,
+            title: parts.title,
+            courseName: parts.course,
             courseCode: nil,
             dueAt: startDate,
             allDayDate: startDate?.startOfDay,
             isAllDay: isAllDay,
             htmlURL: url,
             pointsPossible: nil,
-            description: detailText,
+            description: description.plain,
+            richDescription: description.rich,
             location: location,
             kind: inferredKind(),
-            tags: categories,
+            tags: (categories + parts.tags).uniquePreservingOrder(),
             hasSubmittedSubmissions: nil,
             submission: nil
         )
@@ -206,35 +286,56 @@ private extension ICSParser.Event {
         return .calendarEvent
     }
 
-    func sanitizedDescription() -> String? {
+    func descriptionContent() -> DescriptionContent {
         if let htmlDescription,
-           let plain = ICSTextDecoder.htmlToPlainText(htmlDescription)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !plain.isEmpty {
-            return plain
+           let attributed = ICSTextDecoder.htmlToAttributedString(htmlDescription) {
+            let plain = String(attributed.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !plain.isEmpty {
+                return DescriptionContent(plain: plain, rich: attributed)
+            }
         }
         if let description,
            !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return description
+            return DescriptionContent(plain: description, rich: nil)
         }
-        return nil
+        return DescriptionContent(plain: nil, rich: nil)
     }
 }
 
+private struct SummaryParts {
+    let title: String
+    let course: String?
+    let tags: [String]
+}
+
 private enum SummarySplitter {
-    static func split(_ summary: String) -> (title: String, course: String?) {
-        let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let closingIndex = trimmed.lastIndex(of: "]"),
-              trimmed.index(after: closingIndex) == trimmed.endIndex,
-              let openingIndex = trimmed[..<closingIndex].lastIndex(of: "[") else {
-            return (title: trimmed, course: nil)
+    static func split(_ summary: String) -> SummaryParts {
+        var remaining = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trailingTokens: [String] = []
+
+        while remaining.hasSuffix("]") {
+            guard let closingIndex = remaining.lastIndex(of: "]") else { break }
+            guard let openingIndex = remaining[..<closingIndex].lastIndex(of: "[") else { break }
+            let token = String(remaining[remaining.index(after: openingIndex)..<closingIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            trailingTokens.append(token)
+            remaining = String(remaining[..<openingIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        let course = String(trimmed[trimmed.index(after: openingIndex)..<closingIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-        var title = String(trimmed[..<openingIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-        if title.isEmpty {
-            title = course.isEmpty ? trimmed : "Canvas Event"
+        if remaining.isEmpty {
+            remaining = "Canvas Event"
         }
-        return (title: title, course: course.isEmpty ? nil : course)
+
+        let course = trailingTokens.first?.nilIfEmpty
+        let tags = Array(trailingTokens.dropFirst()).reversed().compactMap { $0.nilIfEmpty }
+
+        return SummaryParts(title: remaining, course: course, tags: tags)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
@@ -265,15 +366,28 @@ private enum ICSTextDecoder {
         return result
     }
 
-    static func htmlToPlainText(_ html: String) -> String? {
-        guard let data = html.data(using: .utf8) else { return nil }
+    static func htmlToAttributedString(_ html: String) -> AttributedString? {
+        let sanitized = stripDangerousTags(from: html)
+        guard let data = sanitized.data(using: .utf8) else { return nil }
         let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
             .documentType: NSAttributedString.DocumentType.html,
             .characterEncoding: String.Encoding.utf8.rawValue
         ]
-        if let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
-            return attributed.string
+        guard let attributed = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else {
+            return nil
         }
-        return nil
+        return AttributedString(attributed)
+    }
+
+    private static func stripDangerousTags(from html: String) -> String {
+        let patterns = ["(?is)<script.*?>.*?</script>", "(?is)<style.*?>.*?</style>"]
+        var sanitized = html
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+                let range = NSRange(sanitized.startIndex..<sanitized.endIndex, in: sanitized)
+                sanitized = regex.stringByReplacingMatches(in: sanitized, options: [], range: range, withTemplate: "")
+            }
+        }
+        return sanitized
     }
 }

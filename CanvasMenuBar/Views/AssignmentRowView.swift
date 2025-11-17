@@ -6,12 +6,14 @@ struct AssignmentRowView: View {
     let isCompleted: Bool
     let showsTracker: Bool
     let toggleCompletion: (() -> Void)?
+    let showDetails: (() -> Void)?
 
-    init(assignment: Assignment, isCompleted: Bool = false, showsTracker: Bool = true, toggleCompletion: (() -> Void)? = nil) {
+    init(assignment: Assignment, isCompleted: Bool = false, showsTracker: Bool = true, toggleCompletion: (() -> Void)? = nil, showDetails: (() -> Void)? = nil) {
         self.assignment = assignment
         self.isCompleted = isCompleted
         self.showsTracker = showsTracker
         self.toggleCompletion = toggleCompletion
+        self.showDetails = showDetails
     }
 
     var body: some View {
@@ -34,6 +36,14 @@ struct AssignmentRowView: View {
                         .strikethrough(showsTracker && isCompleted, color: .primary)
                         .foregroundColor(showsTracker && isCompleted ? .secondary : .primary)
                     Spacer()
+                    if assignment.hasDetails, let showDetails {
+                        Button(action: showDetails) {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("View details")
+                    }
                     if assignment.isSubmitted {
                         Label("Submitted", systemImage: "checkmark.circle.fill")
                             .font(.caption)
@@ -113,6 +123,7 @@ struct AssignmentRowView_Previews: PreviewProvider {
                 htmlURL: nil,
                 pointsPossible: 10,
                 description: "Read pages 121-142 and prepare two discussion questions.",
+                richDescription: nil,
                 location: "Online",
                 kind: .assignment,
                 tags: ["Reading"],
@@ -121,7 +132,8 @@ struct AssignmentRowView_Previews: PreviewProvider {
             ),
             isCompleted: false,
             showsTracker: true,
-            toggleCompletion: {}
+            toggleCompletion: {},
+            showDetails: {}
         )
         .frame(width: 320)
         .padding()

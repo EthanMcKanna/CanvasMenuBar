@@ -16,7 +16,7 @@ CanvasMenuBar is a native SwiftUI menu bar app that keeps your macOS status bar 
    - **API Token (full metadata)** – enter your Canvas domain (e.g. `school.instructure.com`) and a personal access token (Canvas → Account → Settings → *New Access Token*). Follow [Canvas' token guide](https://community.canvaslms.com/t5/Canvas-Basics-Guide/How-do-I-obtain-an-API-access-token-for-an-account/ta-p/386) if you need help.
    - **Calendar Feed (no token required)** – choose *Calendar Feed* and paste the iCal URL from Canvas → Calendar → **Calendar Feed**. This works even if your school blocks API-token creation.
 4. **Refresh** – the assignments list refreshes immediately, and again on the cadence you set in Settings (default: every 30 minutes). Use the `Refresh` button for on-demand syncs.
-5. **Work the list** – use the day navigator (chevrons + the floating `Today` pill) to browse any date. Flip the **All / Assignments / Events** filter, check off assignments you finish, and keep an eye on the progress tracker (you can toggle it off in Settings if you want a minimalist layout).
+5. **Work the list** – use the day navigator (chevrons + the floating `Today` pill) to browse any date. Flip the **All / Assignments / Events** filter, tap the course chips to focus on a single class, check off assignments you finish, and keep an eye on the progress tracker (you can toggle it off in Settings if you want a minimalist layout).
 6. **Menu bar badge** – turn on *Show remaining assignments count* in Settings → **Menu Bar** to see a tiny badge atop the calendar icon. The number always reflects **today’s** remaining assignments, even if you’re previewing future days.
 
 ## How it Works
@@ -27,6 +27,13 @@ CanvasMenuBar is a native SwiftUI menu bar app that keeps your macOS status bar 
 - Credentials are stored outside of `UserDefaults` using the Keychain wrapper in `Services/KeychainService.swift`. A UUID `configurationVersion` is published whenever settings change so `AssignmentsViewModel` knows to refresh.
 - `MenuBarExtra` renders the UI. `AssignmentsMenuView` shows the daily list, relative due times, state badges, and (optionally) a completion tracker. `SettingsView` exposes Canvas connection details **plus** toggles for the tracker, menu bar badge, and launch-on-login behavior.
 - The app hides its Dock icon by setting `LSUIElement = true` in `Info.plist`, so it behaves like a dedicated menu bar utility.
+
+## Calendar Feed Extras
+
+- `ICSAssignmentsService` caches each `.ics` download (re-validating with Canvas' `ETag`) and slices it locally per day, so one refresh grabs the feed once even though we prefetch neighboring dates.
+- Summary suffixes like `Quiz 7.1 [Required] [ECON 202]` become badges. Everything before the final bracket turns into inline tags (“REQUIRED”, “HONORS”, etc.) while the trailing token still maps to the course name, making the new course chips and badge row more informative without API metadata.
+- Tap the info glyph or the row's context menu to open a detail sheet. Calendar-feed HTML lands in a sanitized `AttributedString`, so embedded links stay clickable without dragging the Canvas UI into the menu bar.
+- Locations gain context menu actions (copy or open in Maps) and appear inside the detail sheet too, which is especially useful for .ics-only lab rooms or review sessions.
 
 ## Customization Ideas
 

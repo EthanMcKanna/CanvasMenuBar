@@ -18,22 +18,38 @@ final class AssignmentsViewModel: ObservableObject {
         }
     }
 
+    struct CourseFilter: Identifiable, Equatable {
+        let name: String
+        let count: Int
+
+        var id: String { name }
+    }
+
     @Published private(set) var assignments: [Assignment] = []
     @Published private(set) var isLoading = false
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var errorMessage: String?
     @Published private(set) var selectedDate: Date
     @Published private(set) var completedIDs: Set<String> = []
+    @Published private(set) var courseFilters: [CourseFilter] = []
     @Published var filter: AssignmentFilter {
         didSet {
             defaults.set(filter.rawValue, forKey: filterDefaultsKey)
             applyFilter()
         }
     }
+    @Published var selectedCourses: Set<String> = [] {
+        didSet {
+            if selectedCourses != oldValue {
+                applyFilter()
+            }
+        }
+    }
 
     private let settings: SettingsStore
     private let api: CanvasAPI
     private let completionStore: CompletionStore
+    private let icsService: ICSAssignmentsService
     private var cancellables = Set<AnyCancellable>()
     private var timerCancellable: AnyCancellable?
     private var allAssignments: [Assignment] = []
@@ -52,11 +68,13 @@ final class AssignmentsViewModel: ObservableObject {
     init(settings: SettingsStore,
          api: CanvasAPI = CanvasAPI(),
          completionStore: CompletionStore = CompletionStore(),
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         icsService: ICSAssignmentsService = .shared) {
         self.settings = settings
         self.api = api
         self.completionStore = completionStore
         self.defaults = defaults
+        self.icsService = icsService
         let storedFilterRaw = defaults.string(forKey: filterDefaultsKey)
         self.filter = AssignmentFilter(rawValue: storedFilterRaw ?? "") ?? .all
         self.selectedDate = Calendar.current.startOfDay(for: Date())
@@ -73,10 +91,14 @@ final class AssignmentsViewModel: ObservableObject {
         case configuration
     }
 
-    func refresh(reason: RefreshReason = .manual) async {
+    func refresh(reason: RefreshReason = .manual, forceReloadFeed: Bool? = nil) async {
+        let shouldForceFeedReload = forceReloadFeed ?? (reason != .configuration)
         guard let configuration = settings.sourceConfiguration() else {
             assignments = []
             allAssignments = []
+            todayAssignments = []
+            selectedCourses.removeAll()
+            courseFilters = []
             errorMessage = settings.dataSource == .apiToken ? "Add your Canvas URL and token in Settings." : "Paste your Canvas calendar feed URL in Settings."
             lastUpdatedAt = nil
             return
@@ -89,7 +111,7 @@ final class AssignmentsViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let fetched = try await fetchAssignments(for: targetDate, configuration: configuration)
+            let fetched = try await fetchAssignments(for: targetDate, configuration: configuration, forceReloadFeed: shouldForceFeedReload)
             processFetched(fetched, for: targetDate)
             if Calendar.current.isDate(targetDate, inSameDayAs: selectedDate) {
                 lastUpdatedAt = Date()
@@ -113,12 +135,12 @@ final class AssignmentsViewModel: ObservableObject {
     func changeDay(by delta: Int) {
         guard let newDate = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) else { return }
         prepareForNewDate(Calendar.current.startOfDay(for: newDate))
-        Task { await refresh(reason: .configuration) }
+        Task { await refresh(reason: .configuration, forceReloadFeed: false) }
     }
 
     func goToToday() {
         prepareForNewDate(Calendar.current.startOfDay(for: Date()))
-        Task { await refresh(reason: .configuration) }
+        Task { await refresh(reason: .configuration, forceReloadFeed: false) }
     }
 
     func isCompleted(_ assignment: Assignment) -> Bool {
@@ -127,6 +149,19 @@ final class AssignmentsViewModel: ObservableObject {
 
     func toggleCompletion(for assignment: Assignment) {
         completedIDs = completionStore.toggle(id: assignment.id, on: selectedDate)
+    }
+
+    func toggleCourseFilter(_ name: String) {
+        if selectedCourses.contains(name) {
+            selectedCourses.remove(name)
+        } else {
+            selectedCourses.insert(name)
+        }
+    }
+
+    func clearCourseFilters() {
+        guard !selectedCourses.isEmpty else { return }
+        selectedCourses.removeAll()
     }
 
     var hasOffset: Bool {
@@ -167,6 +202,10 @@ final class AssignmentsViewModel: ObservableObject {
         trackableAssignmentsCount > 0
     }
 
+    var isFilteringCourses: Bool {
+        !selectedCourses.isEmpty
+    }
+
     var remainingAssignmentsCount: Int {
         let targetAssignments = badgeAssignments()
         guard !targetAssignments.isEmpty else { return 0 }
@@ -191,11 +230,35 @@ final class AssignmentsViewModel: ObservableObject {
 }
 
 private extension AssignmentsViewModel {
+    func rebuildCourseFilters() {
+        var counts: [String: Int] = [:]
+        for assignment in allAssignments {
+            let name = assignment.displayCourse
+            counts[name, default: 0] += 1
+        }
+        let sortedNames = counts.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        courseFilters = sortedNames.compactMap { name in
+            guard let count = counts[name] else { return nil }
+            return CourseFilter(name: name, count: count)
+        }
+        let filteredSelection = selectedCourses.filter { counts[$0] != nil }
+        if filteredSelection != selectedCourses {
+            selectedCourses = filteredSelection
+        }
+        if counts.isEmpty && !selectedCourses.isEmpty {
+            selectedCourses.removeAll()
+        }
+    }
+
     func observeSettings() {
         settings.$configurationVersion
             .sink { [weak self] _ in
-                self?.invalidateCache()
-                Task { await self?.refresh(reason: .configuration) }
+                guard let self else { return }
+                self.invalidateCache()
+                Task {
+                    await self.icsService.invalidateCache()
+                    await self.refresh(reason: .configuration, forceReloadFeed: true)
+                }
             }
             .store(in: &cancellables)
 
@@ -222,14 +285,19 @@ private extension AssignmentsViewModel {
     }
 
     func applyFilter() {
+        var filtered: [Assignment]
         switch filter {
         case .all:
-            assignments = allAssignments
+            filtered = allAssignments
         case .assignments:
-            assignments = allAssignments.filter { $0.kind == .assignment }
+            filtered = allAssignments.filter { $0.kind == .assignment }
         case .events:
-            assignments = allAssignments.filter { $0.kind == .calendarEvent }
+            filtered = allAssignments.filter { $0.kind == .calendarEvent }
         }
+        if !selectedCourses.isEmpty {
+            filtered = filtered.filter { selectedCourses.contains($0.displayCourse) }
+        }
+        assignments = filtered
     }
 
     func prepareForNewDate(_ date: Date) {
@@ -238,10 +306,12 @@ private extension AssignmentsViewModel {
         errorMessage = nil
         if let cached = cachedAssignments(for: date) {
             allAssignments = cached
+            rebuildCourseFilters()
             applyFilter()
         } else {
             allAssignments = []
             assignments = []
+            rebuildCourseFilters()
         }
     }
 
@@ -251,6 +321,7 @@ private extension AssignmentsViewModel {
             let rightDate = rhs.normalizedDueDate ?? .distantFuture
             return leftDate < rightDate
         }
+        rebuildCourseFilters()
         cache(assignments: allAssignments, for: date)
         if Calendar.current.isDateInToday(date) {
             todayAssignments = allAssignments
@@ -268,13 +339,13 @@ private extension AssignmentsViewModel {
         return todayAssignments
     }
 
-    func fetchAssignments(for date: Date, configuration: AssignmentsSourceConfiguration) async throws -> [Assignment] {
+    func fetchAssignments(for date: Date, configuration: AssignmentsSourceConfiguration, forceReloadFeed: Bool) async throws -> [Assignment] {
         let bounds = Calendar.current.dayBounds(for: date)
         switch configuration {
         case .canvasAPI(let credentials):
             return try await api.fetchAssignments(credentials: credentials, bounds: bounds)
         case .calendarFeed(let url):
-            return try await ICSAssignmentsService().fetchAssignments(feedURL: url, bounds: bounds)
+            return try await icsService.fetchAssignments(feedURL: url, bounds: bounds, forceReload: forceReloadFeed)
         }
     }
 
@@ -297,7 +368,7 @@ private extension AssignmentsViewModel {
             Task { [weak self] in
                 guard let self else { return }
                 do {
-                    let result = try await fetchAssignments(for: target, configuration: configuration)
+                    let result = try await fetchAssignments(for: target, configuration: configuration, forceReloadFeed: false)
                     await MainActor.run {
                         self.cache(assignments: result, for: target)
                         if Calendar.current.isDateInToday(target) {
@@ -314,5 +385,7 @@ private extension AssignmentsViewModel {
     func invalidateCache() {
         assignmentCache.removeAll()
         todayAssignments = []
+        courseFilters = []
+        selectedCourses.removeAll()
     }
 }
