@@ -96,25 +96,25 @@ jobs:
           : "${ARCHIVE_PATH:?Archive path not found}"
           EXPORT_OPTIONS="$RUNNER_TEMP/exportOptions.plist"
           cat <<'PLIST' > "$EXPORT_OPTIONS"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>developer-id</string>
-  <key>signingStyle</key>
-  <string>manual</string>
-  <key>teamID</key>
-  <string>${{ secrets.APPLE_TEAM_ID }}</string>
-  <key>signingCertificate</key>
-  <string>${{ secrets.MACOS_CERT_IDENTITY }}</string>
-  <key>stripSwiftSymbols</key>
-  <true/>
-  <key>destination</key>
-  <string>export</string>
-</dict>
-</plist>
-PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>developer-id</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingCertificate</key>
+            <string>${{ secrets.MACOS_CERT_IDENTITY }}</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>export</string>
+          </dict>
+          </plist>
+          PLIST
           EXPORT_DIR="$RUNNER_TEMP/export"
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
