@@ -89,43 +89,19 @@ jobs:
             archive
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
-      - name: Export signed app bundle
+      - name: Locate archived app bundle
         shell: bash
         run: |
           set -euo pipefail
           : "${ARCHIVE_PATH:?Archive path not found}"
-          EXPORT_OPTIONS="$RUNNER_TEMP/exportOptions.plist"
-          cat <<'PLIST' > "$EXPORT_OPTIONS"
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>developer-id</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>teamID</key>
-            <string>${{ secrets.APPLE_TEAM_ID }}</string>
-            <key>signingCertificate</key>
-            <string>${{ secrets.MACOS_CERT_IDENTITY }}</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>destination</key>
-            <string>export</string>
-          </dict>
-          </plist>
-          PLIST
-          EXPORT_DIR="$RUNNER_TEMP/export"
-          xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
-            -exportPath "$EXPORT_DIR" \
-            -exportOptionsPlist "$EXPORT_OPTIONS"
-          APP_PATH="$EXPORT_DIR/$APP_NAME.app"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "Failed to export signed app." >&2
-            ls -R "$EXPORT_DIR"
+            echo "Could not find bundled app at $APP_PATH" >&2
+            ls -R "$ARCHIVE_PATH"
             exit 1
           fi
+          # surface codesign metadata for easier debugging
+          /usr/bin/codesign --display --verbose=2 "$APP_PATH"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
       - name: Create distributable zip
