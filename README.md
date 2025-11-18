@@ -63,3 +63,15 @@ The feed includes all assignments/events visible on your calendar, and CanvasMen
 - **Launch at login** toggle errors: Some enterprise machines block programmatic login items. If you see an error in Settings, manually add the app in **System Settings → General → Login Items**.
 
 Feel free to extend the project or integrate with login items if you want it to launch automatically at login.
+
+## Automated Releases
+
+Publishing a GitHub release now triggers the workflow in `.github/workflows/release.yml`, which builds a signed `CanvasMenuBar.app`, zips it with `ditto`, uploads the artifact, and (for release events) attaches the zip to the release automatically. The workflow expects the following repository secrets:
+
+- `MACOS_CERTIFICATE` – Base64-encoded `Developer ID Application` certificate (`.p12`).
+- `MACOS_CERTIFICATE_PASSWORD` – Password used when exporting that `.p12` file.
+- `KEYCHAIN_PASSWORD` – Any strong passphrase for the temporary CI keychain.
+- `MACOS_CERT_IDENTITY` – The `codesign` identity string (e.g., `Developer ID Application: Jane Doe (ABCDE12345)`).
+- `APPLE_TEAM_ID` – Your 10-character Apple Developer Team ID.
+
+Create a GitHub release (or run the workflow manually) after these secrets are in place to produce a signed bundle named `CanvasMenuBar-<tag>.zip` that you can distribute directly to users.
