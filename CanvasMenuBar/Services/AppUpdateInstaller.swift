@@ -92,6 +92,7 @@ final class AppUpdateInstaller: ObservableObject {
         let appURL = preferredInstallLocation()
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
+        configuration.createsNewApplicationInstance = true
         NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
             if let error {
                 NSLog("Failed to relaunch CanvasMenuBar: %@", error.localizedDescription)
