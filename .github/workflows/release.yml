@@ -150,19 +150,19 @@ jobs:
           cat "$SUBMISSION_JSON"
           export SUBMISSION_JSON
           SUBMISSION_ID=$(python3 - <<'PY'
-import json, os
-with open(os.environ['SUBMISSION_JSON']) as fh:
-    data = json.load(fh)
-print(data.get('id', ''))
-PY
-)
+          import json, os
+          with open(os.environ['SUBMISSION_JSON']) as fh:
+              data = json.load(fh)
+          print(data.get('id', ''))
+          PY
+          )
           STATUS=$(python3 - <<'PY'
-import json, os
-with open(os.environ['SUBMISSION_JSON']) as fh:
-    data = json.load(fh)
-print(data.get('status', ''))
-PY
-)
+          import json, os
+          with open(os.environ['SUBMISSION_JSON']) as fh:
+              data = json.load(fh)
+          print(data.get('status', ''))
+          PY
+          )
           echo "NOTARY_SUBMISSION_ID=$SUBMISSION_ID" >> "$GITHUB_ENV"
           if [ "$STATUS" != "Accepted" ]; then
             LOG_PATH="$RUNNER_TEMP/notarytool-log.json"
