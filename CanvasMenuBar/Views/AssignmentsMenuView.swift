@@ -4,6 +4,8 @@ import AppKit
 struct AssignmentsMenuView: View {
     @ObservedObject var viewModel: AssignmentsViewModel
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var updateChecker: AppUpdateChecker
+    @ObservedObject var updateInstaller: AppUpdateInstaller
     @Environment(\.openURL) private var openURL
     @State private var detailAssignment: Assignment?
     @State private var showingSettings = false
@@ -67,7 +69,7 @@ struct AssignmentsMenuView: View {
         VStack(spacing: 0) {
             settingsToolbar
             Divider()
-            SettingsView(settings: settings)
+            SettingsView(settings: settings, updateChecker: updateChecker, updateInstaller: updateInstaller)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .transition(.move(edge: .trailing).combined(with: .opacity))

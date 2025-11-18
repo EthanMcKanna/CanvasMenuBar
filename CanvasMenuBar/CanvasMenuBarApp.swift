@@ -4,16 +4,23 @@ import SwiftUI
 struct CanvasMenuBarApp: App {
     @StateObject private var settingsStore: SettingsStore
     @StateObject private var assignmentsViewModel: AssignmentsViewModel
+    @StateObject private var updateChecker: AppUpdateChecker
+    @StateObject private var updateInstaller: AppUpdateInstaller
 
     init() {
         let settings = SettingsStore()
         _settingsStore = StateObject(wrappedValue: settings)
         _assignmentsViewModel = StateObject(wrappedValue: AssignmentsViewModel(settings: settings))
+        _updateChecker = StateObject(wrappedValue: AppUpdateChecker())
+        _updateInstaller = StateObject(wrappedValue: AppUpdateInstaller())
     }
 
     var body: some Scene {
         MenuBarExtra {
-            AssignmentsMenuView(viewModel: assignmentsViewModel, settings: settingsStore)
+            AssignmentsMenuView(viewModel: assignmentsViewModel,
+                                settings: settingsStore,
+                                updateChecker: updateChecker,
+                                updateInstaller: updateInstaller)
                 .environmentObject(settingsStore)
         } label: {
             Label {

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		07D6EE591D3A8B06E0449609 /* AssignmentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3BF7228EE7FAA147539F7E /* AssignmentsViewModel.swift */; };
+		09932DD6B8EAF1CE0C1F3A7C /* AppUpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09932DD5B8EAF1CE0C1F3A7C /* AppUpdateInstaller.swift */; };
 		0A5648897ADE1D96AE6F7F43 /* ICSDateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E4345660028D80FA247979A /* ICSDateParser.swift */; };
 		0D8C41E90FEFC7B6AB214665 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76270AB7598F45D699742280 /* KeychainService.swift */; };
 		23F9E02191194233E843B2A7 /* AssignmentsMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDAEDFC1D066E9B20ED410 /* AssignmentsMenuView.swift */; };
@@ -26,20 +27,29 @@
 		B0B4A8FA0900319FB1D1F6F9 /* ICSAssignmentsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4DAA14EF21C92AE2CAEBA2F /* ICSAssignmentsService.swift */; };
 		8C76A4E2B2DFA3C4E5F60789 /* AssignmentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C76A4E1B2DFA3C4E5F60789 /* AssignmentDetailView.swift */; };
 		C3EE3D29C35E5761D5E8C11E /* AssignmentRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF92B56A047EAE74C61B72BA /* AssignmentRowView.swift */; };
+		C0FBEAFEA9F0472AB4AAEB1B /* SemanticVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FBEAF9A9F0472AB4AAEB1B /* SemanticVersion.swift */; };
+		D52EAAA0089D4E4DB6840C1F /* GitHubReleaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52EAA9F089D4E4DB6840C1F /* GitHubReleaseService.swift */; };
 		E7FDACB64BB8640DC60814F4 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 82F4E93E601A003E2C93C41B /* Cocoa.framework */; };
+		E2A5535BD1A1C10794A34332 /* AppUpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A5535AD1A1C10794A34332 /* AppUpdateChecker.swift */; };
+		F7C613852A7E4B8A8854049B /* Bundle+Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C613842A7E4B8A8854049B /* Bundle+Version.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		134888136E6111E1ED9F899A /* CanvasMenuBarApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CanvasMenuBarApp.swift; path = CanvasMenuBar/CanvasMenuBarApp.swift; sourceTree = "<group>"; };
 		1D3BF7228EE7FAA147539F7E /* AssignmentsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssignmentsViewModel.swift; path = CanvasMenuBar/ViewModels/AssignmentsViewModel.swift; sourceTree = "<group>"; };
+		09932DD5B8EAF1CE0C1F3A7C /* AppUpdateInstaller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppUpdateInstaller.swift; path = CanvasMenuBar/Services/AppUpdateInstaller.swift; sourceTree = "<group>"; };
 		328530CBE8836AEF0059924E /* SettingsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsStore.swift; path = CanvasMenuBar/Services/SettingsStore.swift; sourceTree = "<group>"; };
+		C0FBEAF9A9F0472AB4AAEB1B /* SemanticVersion.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SemanticVersion.swift; path = CanvasMenuBar/Utilities/SemanticVersion.swift; sourceTree = "<group>"; };
 		398FA6F06D7ADA3243665C77 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = CanvasMenuBar/Views/SettingsView.swift; sourceTree = "<group>"; };
+		D52EAA9F089D4E4DB6840C1F /* GitHubReleaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GitHubReleaseService.swift; path = CanvasMenuBar/Services/GitHubReleaseService.swift; sourceTree = "<group>"; };
 		46890C73B6AA728E9116F69B /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4ADDAEDFC1D066E9B20ED410 /* AssignmentsMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssignmentsMenuView.swift; path = CanvasMenuBar/Views/AssignmentsMenuView.swift; sourceTree = "<group>"; };
 		8C76A4E1B2DFA3C4E5F60789 /* AssignmentDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssignmentDetailView.swift; path = CanvasMenuBar/Views/AssignmentDetailView.swift; sourceTree = "<group>"; };
+		E2A5535AD1A1C10794A34332 /* AppUpdateChecker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppUpdateChecker.swift; path = CanvasMenuBar/ViewModels/AppUpdateChecker.swift; sourceTree = "<group>"; };
 		76270AB7598F45D699742280 /* KeychainService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainService.swift; path = CanvasMenuBar/Services/KeychainService.swift; sourceTree = "<group>"; };
 		7B5DFD26704A1F04DA45143C /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LaunchAtLoginController.swift; path = CanvasMenuBar/Services/LaunchAtLoginController.swift; sourceTree = "<group>"; };
 		7E4345660028D80FA247979A /* ICSDateParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ICSDateParser.swift; path = CanvasMenuBar/Utilities/ICSDateParser.swift; sourceTree = "<group>"; };
+		F7C613842A7E4B8A8854049B /* Bundle+Version.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Bundle+Version.swift"; path = "CanvasMenuBar/Utilities/Bundle+Version.swift"; sourceTree = "<group>"; };
 		81F83008B1D55B17A18AB332 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmptyStateView.swift; path = CanvasMenuBar/Views/EmptyStateView.swift; sourceTree = "<group>"; };
 		82F4E93E601A003E2C93C41B /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		B5FF6E77BB95F963D9D60AE1 /* Preview Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = "Preview Assets.xcassets"; path = "CanvasMenuBar/Preview Content/Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -86,14 +96,19 @@
 				C4DAA14EF21C92AE2CAEBA2F /* ICSAssignmentsService.swift */,
 				76270AB7598F45D699742280 /* KeychainService.swift */,
 				7B5DFD26704A1F04DA45143C /* LaunchAtLoginController.swift */,
+				09932DD5B8EAF1CE0C1F3A7C /* AppUpdateInstaller.swift */,
 				328530CBE8836AEF0059924E /* SettingsStore.swift */,
+				D52EAA9F089D4E4DB6840C1F /* GitHubReleaseService.swift */,
 				D68D8878F2EC28831DED2848 /* Date+Extensions.swift */,
+				F7C613842A7E4B8A8854049B /* Bundle+Version.swift */,
 				7E4345660028D80FA247979A /* ICSDateParser.swift */,
-			1D3BF7228EE7FAA147539F7E /* AssignmentsViewModel.swift */,
-			EF92B56A047EAE74C61B72BA /* AssignmentRowView.swift */,
-			8C76A4E1B2DFA3C4E5F60789 /* AssignmentDetailView.swift */,
-			4ADDAEDFC1D066E9B20ED410 /* AssignmentsMenuView.swift */,
-			81F83008B1D55B17A18AB332 /* EmptyStateView.swift */,
+				C0FBEAF9A9F0472AB4AAEB1B /* SemanticVersion.swift */,
+				1D3BF7228EE7FAA147539F7E /* AssignmentsViewModel.swift */,
+				E2A5535AD1A1C10794A34332 /* AppUpdateChecker.swift */,
+				EF92B56A047EAE74C61B72BA /* AssignmentRowView.swift */,
+				8C76A4E1B2DFA3C4E5F60789 /* AssignmentDetailView.swift */,
+				4ADDAEDFC1D066E9B20ED410 /* AssignmentsMenuView.swift */,
+				81F83008B1D55B17A18AB332 /* EmptyStateView.swift */,
 				398FA6F06D7ADA3243665C77 /* SettingsView.swift */,
 			);
 			sourceTree = "<group>";
@@ -205,11 +220,16 @@
 				3B71CDDE3F20B101D5F6DE35 /* CanvasAPI.swift in Sources */,
 				7CCF135EBA9A6A68F662731E /* CompletionStore.swift in Sources */,
 				B0B4A8FA0900319FB1D1F6F9 /* ICSAssignmentsService.swift in Sources */,
+				D52EAAA0089D4E4DB6840C1F /* GitHubReleaseService.swift in Sources */,
+				09932DD6B8EAF1CE0C1F3A7C /* AppUpdateInstaller.swift in Sources */,
 				0D8C41E90FEFC7B6AB214665 /* KeychainService.swift in Sources */,
 				5F79D2C71CEDC5F40025D228 /* LaunchAtLoginController.swift in Sources */,
 				853B51992A9949569A012834 /* SettingsStore.swift in Sources */,
+				E2A5535BD1A1C10794A34332 /* AppUpdateChecker.swift in Sources */,
 				2C457605974E21ECBE7835D2 /* Date+Extensions.swift in Sources */,
+				F7C613852A7E4B8A8854049B /* Bundle+Version.swift in Sources */,
 				0A5648897ADE1D96AE6F7F43 /* ICSDateParser.swift in Sources */,
+				C0FBEAFEA9F0472AB4AAEB1B /* SemanticVersion.swift in Sources */,
 				07D6EE591D3A8B06E0449609 /* AssignmentsViewModel.swift in Sources */,
 				C3EE3D29C35E5761D5E8C11E /* AssignmentRowView.swift in Sources */,
 				8C76A4E2B2DFA3C4E5F60789 /* AssignmentDetailView.swift in Sources */,
@@ -289,7 +309,7 @@
 				INFOPLIST_FILE = CanvasMenuBar/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ethanmckanna.CanvasMenuBar;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -370,7 +390,7 @@
 				INFOPLIST_FILE = CanvasMenuBar/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ethanmckanna.CanvasMenuBar;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;

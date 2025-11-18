@@ -1,7 +1,12 @@
 import SwiftUI
+import Foundation
 
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var updateChecker: AppUpdateChecker
+    @ObservedObject var updateInstaller: AppUpdateInstaller
+
+    @Environment(\.openURL) private var openURL
 
     @State private var apiTokenInput: String = ""
     @State private var statusMessage: String?
@@ -130,11 +135,48 @@ struct SettingsView: View {
                         Label("Not connected yet", systemImage: "exclamationmark.triangle")
                     }
                 }
+
+                SectionCard(title: "Updates",
+                            systemImage: "arrow.triangle.2.circlepath",
+                            description: "Check GitHub releases for newer versions.") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current version \(updateChecker.currentVersion)")
+                            .font(.subheadline.weight(.semibold))
+                        updateStatusView
+                        HStack {
+                            Button {
+                                updateChecker.refresh()
+                            } label: {
+                                Label(updateChecker.isChecking ? "Checking…" : "Check for Updates",
+                                      systemImage: "arrow.clockwise")
+                            }
+                            .disabled(updateChecker.isChecking || updateInstaller.isBusy)
+
+                            if let update = updateChecker.availableUpdate {
+                                Button(installButtonTitle(for: update)) {
+                                    if update.downloadURL != nil {
+                                        updateInstaller.install(update: update)
+                                    } else {
+                                        openUpdateDestination(update)
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(updateInstaller.isBusy)
+                            }
+                        }
+                        .controlSize(.small)
+                        installerStatusView
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
         }
         .frame(minWidth: 420, idealWidth: 480, minHeight: 460)
+        .task {
+            guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == nil else { return }
+            await updateChecker.loadIfNeeded()
+        }
     }
 
     private var header: some View {
@@ -194,6 +236,99 @@ struct SettingsView: View {
             statusColor = .red
         }
     }
+
+    @ViewBuilder
+    private var updateStatusView: some View {
+        switch updateChecker.state {
+        case .idle:
+            Text("Haven't checked for updates yet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .checking:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking GitHub…")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        case .failed(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.red)
+        case .upToDate(let version):
+            Text("You're on the latest release (\(version)).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let last = updateChecker.lastCheckedAt {
+                Text("Last checked \(last.formatted(date: .abbreviated, time: .shortened)).")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        case .updateAvailable(let update):
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Version \(update.latestVersion) is available.")
+                    .font(.subheadline.weight(.semibold))
+                if let published = update.publishedAt {
+                    Text("Published \(published.formatted(date: .abbreviated, time: .shortened)).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let notes = update.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(6)
+                }
+                if let last = updateChecker.lastCheckedAt {
+                    Text("Last checked \(last.formatted(date: .abbreviated, time: .shortened)).")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var installerStatusView: some View {
+        switch updateInstaller.state {
+        case .idle:
+            EmptyView()
+        case .downloading:
+            Label("Downloading latest release…", systemImage: "arrow.down.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .installing:
+            Label("Installing to Applications…", systemImage: "square.and.arrow.down.on.square")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .relaunching:
+            Label("Relaunching CanvasMenuBar…", systemImage: "sparkles")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .success:
+            Label("Update installed. Relaunching…", systemImage: "checkmark.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .failed(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.red)
+        }
+    }
+
+    private func installButtonTitle(for update: AppUpdateChecker.AppUpdate) -> String {
+        update.downloadURL == nil ? "View Release" : (updateInstaller.isBusy ? "Installing…" : "Install Update")
+    }
+
+    private func openUpdateDestination(_ update: AppUpdateChecker.AppUpdate) {
+        if let downloadURL = update.downloadURL {
+            openURL(downloadURL)
+        } else {
+            openURL(update.releaseURL)
+        }
+    }
 }
 
 private struct SectionCard<Content: View>: View {
@@ -235,7 +370,9 @@ private struct SectionCard<Content: View>: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(settings: SettingsStore())
+        SettingsView(settings: SettingsStore(),
+                     updateChecker: AppUpdateChecker(),
+                     updateInstaller: AppUpdateInstaller())
             .frame(width: 480, height: 480)
     }
 }
