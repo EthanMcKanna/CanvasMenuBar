@@ -104,6 +104,55 @@ jobs:
           /usr/bin/codesign --display --verbose=2 "$APP_PATH"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
+      - name: Prepare notarization key
+        env:
+          NOTARYTOOL_KEY: ${{ secrets.NOTARYTOOL_KEY }}
+          NOTARYTOOL_KEY_ID: ${{ secrets.NOTARYTOOL_KEY_ID }}
+          NOTARYTOOL_ISSUER: ${{ secrets.NOTARYTOOL_ISSUER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$NOTARYTOOL_KEY" ] || [ -z "$NOTARYTOOL_KEY_ID" ] || [ -z "$NOTARYTOOL_ISSUER" ]; then
+            echo "Missing notarization secrets. Please configure NOTARYTOOL_KEY, NOTARYTOOL_KEY_ID, and NOTARYTOOL_ISSUER." >&2
+            exit 1
+          fi
+          KEY_FILE="$RUNNER_TEMP/AuthKey.p8"
+          echo "$NOTARYTOOL_KEY" | base64 --decode > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          echo "NOTARY_KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+          echo "NOTARYTOOL_KEY_ID=$NOTARYTOOL_KEY_ID" >> "$GITHUB_ENV"
+          echo "NOTARYTOOL_ISSUER=$NOTARYTOOL_ISSUER" >> "$GITHUB_ENV"
+
+      - name: Create notarization archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APP_PATH:?Missing exported app path}"
+          NOTARIZE_ZIP_PATH="$RUNNER_TEMP/$APP_NAME-notarize.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$NOTARIZE_ZIP_PATH"
+          echo "NOTARIZE_ZIP_PATH=$NOTARIZE_ZIP_PATH" >> "$GITHUB_ENV"
+
+      - name: Notarize app
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${NOTARIZE_ZIP_PATH:?Missing notarization zip}"
+          : "${NOTARY_KEY_FILE:?Missing notarization key file}"
+          : "${NOTARYTOOL_KEY_ID:?Missing notarization key id}"
+          : "${NOTARYTOOL_ISSUER:?Missing notarization issuer}"
+          xcrun notarytool submit "$NOTARIZE_ZIP_PATH" \
+            --key "$NOTARY_KEY_FILE" \
+            --key-id "$NOTARYTOOL_KEY_ID" \
+            --issuer "$NOTARYTOOL_ISSUER" \
+            --wait
+
+      - name: Staple notarization ticket
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APP_PATH:?Missing exported app path}"
+          xcrun stapler staple "$APP_PATH"
+
       - name: Create distributable zip
         shell: bash
         run: |

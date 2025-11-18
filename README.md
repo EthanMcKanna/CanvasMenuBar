@@ -73,5 +73,8 @@ Publishing a GitHub release now triggers the workflow in `.github/workflows/rele
 - `KEYCHAIN_PASSWORD` – Any strong passphrase for the temporary CI keychain.
 - `MACOS_CERT_IDENTITY` – The `codesign` identity string (e.g., `Developer ID Application: Jane Doe (ABCDE12345)`).
 - `APPLE_TEAM_ID` – Your 10-character Apple Developer Team ID.
+- `NOTARYTOOL_KEY` – Base64-encoded App Store Connect API key (`.p8`) used by `notarytool`.
+- `NOTARYTOOL_KEY_ID` – The Key ID associated with that API key.
+- `NOTARYTOOL_ISSUER` – The Issuer ID from App Store Connect.
 
-Create a GitHub release (or run the workflow manually) after these secrets are in place to produce a signed bundle named `CanvasMenuBar-<tag>.zip` that you can distribute directly to users.
+Create a GitHub release (or run the workflow manually) after these secrets are in place to produce a signed, notarized, and stapled bundle named `CanvasMenuBar-<tag>.zip` that you can distribute directly to users without Gatekeeper warnings.
