@@ -104,6 +104,23 @@ jobs:
           /usr/bin/codesign --display --verbose=2 "$APP_PATH"
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
+      - name: Re-sign app with hardened runtime + timestamp
+        env:
+          MACOS_CERT_IDENTITY: ${{ secrets.MACOS_CERT_IDENTITY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APP_PATH:?Missing exported app path}"
+          : "${SIGNING_KEYCHAIN:?Missing signing keychain}"
+          if [ -z "$MACOS_CERT_IDENTITY" ]; then
+            echo "MACOS_CERT_IDENTITY secret is required for codesigning" >&2
+            exit 1
+          fi
+          /usr/bin/codesign --force --deep --options runtime --timestamp \
+            --keychain "$SIGNING_KEYCHAIN" \
+            --sign "$MACOS_CERT_IDENTITY" "$APP_PATH"
+          /usr/bin/codesign --verify --strict --deep "$APP_PATH"
+
       - name: Prepare notarization key
         env:
           NOTARYTOOL_KEY: ${{ secrets.NOTARYTOOL_KEY }}
