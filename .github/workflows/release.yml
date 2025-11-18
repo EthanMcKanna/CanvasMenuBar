@@ -140,11 +140,41 @@ jobs:
           : "${NOTARY_KEY_FILE:?Missing notarization key file}"
           : "${NOTARYTOOL_KEY_ID:?Missing notarization key id}"
           : "${NOTARYTOOL_ISSUER:?Missing notarization issuer}"
+          SUBMISSION_JSON="$RUNNER_TEMP/notarytool-result.json"
           xcrun notarytool submit "$NOTARIZE_ZIP_PATH" \
             --key "$NOTARY_KEY_FILE" \
             --key-id "$NOTARYTOOL_KEY_ID" \
             --issuer "$NOTARYTOOL_ISSUER" \
-            --wait
+            --wait \
+            --output-format json > "$SUBMISSION_JSON"
+          cat "$SUBMISSION_JSON"
+          export SUBMISSION_JSON
+          SUBMISSION_ID=$(python3 - <<'PY'
+import json, os
+with open(os.environ['SUBMISSION_JSON']) as fh:
+    data = json.load(fh)
+print(data.get('id', ''))
+PY
+)
+          STATUS=$(python3 - <<'PY'
+import json, os
+with open(os.environ['SUBMISSION_JSON']) as fh:
+    data = json.load(fh)
+print(data.get('status', ''))
+PY
+)
+          echo "NOTARY_SUBMISSION_ID=$SUBMISSION_ID" >> "$GITHUB_ENV"
+          if [ "$STATUS" != "Accepted" ]; then
+            LOG_PATH="$RUNNER_TEMP/notarytool-log.json"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key "$NOTARY_KEY_FILE" \
+              --key-id "$NOTARYTOOL_KEY_ID" \
+              --issuer "$NOTARYTOOL_ISSUER" \
+              --output-format json > "$LOG_PATH" || true
+            echo "Notarization failed with status $STATUS"
+            cat "$LOG_PATH"
+            exit 1
+          fi
 
       - name: Staple notarization ticket
         shell: bash
