@@ -19,6 +19,39 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
 
+                SectionCard(title: "Updates",
+                            systemImage: "arrow.triangle.2.circlepath",
+                            description: "Stay up to date with the latest CanvasMenuBar release.") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current version \(updateChecker.currentVersion)")
+                            .font(.subheadline.weight(.semibold))
+                        updateStatusView
+                        HStack {
+                            Button {
+                                updateChecker.refresh()
+                            } label: {
+                                Label(updateChecker.isChecking ? "Checking…" : "Check for Updates",
+                                      systemImage: "arrow.clockwise")
+                            }
+                            .disabled(updateChecker.isChecking || updateInstaller.isBusy)
+
+                            if let update = updateChecker.availableUpdate {
+                                Button(installButtonTitle(for: update)) {
+                                    if update.downloadURL != nil {
+                                        updateInstaller.install(update: update)
+                                    } else {
+                                        openUpdateDestination(update)
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(updateInstaller.isBusy)
+                            }
+                        }
+                        .controlSize(.small)
+                        installerStatusView
+                    }
+                }
+
                 SectionCard(title: "Data Source",
                             systemImage: "slider.horizontal.3",
                             description: "Choose how CanvasMenuBar pulls assignments for the day.") {
@@ -136,38 +169,6 @@ struct SettingsView: View {
                     }
                 }
 
-                SectionCard(title: "Updates",
-                            systemImage: "arrow.triangle.2.circlepath",
-                            description: "Check GitHub releases for newer versions.") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Current version \(updateChecker.currentVersion)")
-                            .font(.subheadline.weight(.semibold))
-                        updateStatusView
-                        HStack {
-                            Button {
-                                updateChecker.refresh()
-                            } label: {
-                                Label(updateChecker.isChecking ? "Checking…" : "Check for Updates",
-                                      systemImage: "arrow.clockwise")
-                            }
-                            .disabled(updateChecker.isChecking || updateInstaller.isBusy)
-
-                            if let update = updateChecker.availableUpdate {
-                                Button(installButtonTitle(for: update)) {
-                                    if update.downloadURL != nil {
-                                        updateInstaller.install(update: update)
-                                    } else {
-                                        openUpdateDestination(update)
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(updateInstaller.isBusy)
-                            }
-                        }
-                        .controlSize(.small)
-                        installerStatusView
-                    }
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
@@ -248,7 +249,7 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Checking GitHub…")
+                Text("Checking for updates…")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
